@@ -81,13 +81,28 @@ const generateAIResponse = async (text) => {
 export const initializeSocket = (io) => {
     io.on('connection', (socket) => {
         console.log(`User Connected: ${socket.id}`);
+        let currentUserId = null;
 
-        socket.on('join_room', (data) => {
+        socket.on('join_room', async (data) => {
             socket.join(data);
             console.log(`User with ID: ${socket.id} joined room: ${data}`);
+
+            // If the room name matches a User ID (simple check: length > 10 and no underscores), assume it's the user's personal room
+            // Ideally, the frontend should emit a specific 'register_user' event, but we can piggyback on join_room(userId)
+            if (!data.includes('_') && data.length > 10) {
+                currentUserId = data;
+                try {
+                    const User = (await import('../models/User.js')).default;
+                    await User.findByIdAndUpdate(currentUserId, { isOnline: true });
+                    io.emit('user_status_change', { userId: currentUserId, isOnline: true });
+                } catch (err) {
+                    console.error('Error updating online status:', err);
+                }
+            }
         });
 
         socket.on('send_message', async (data) => {
+            // ... (existing message logic) ...
             console.log('Received message:', data);
 
             try {
@@ -95,19 +110,7 @@ export const initializeSocket = (io) => {
                 const translations = await translateMessage(data.message, data.lang || 'en');
 
                 // 2. Find or create conversation
-                // We need senderId and receiverId. 
-                // data.room is currently "userId1_userId2"
                 const participants = data.room.split('_');
-                // We need to know which one is the sender. 
-                // Ideally data should have senderId. 
-                // For now, let's assume we can look up user by email (data.author)
-                // But better to pass senderId from frontend.
-
-                // Let's rely on the frontend sending senderId and receiverId in data if possible, 
-                // or infer from room if we trust the room name.
-                // Room format: "minId_maxId"
-
-                // To be safe and robust, let's look up the sender by email
                 const User = (await import('../models/User.js')).default;
                 const Conversation = (await import('../models/Conversation.js')).default;
                 const Message = (await import('../models/Message.js')).default;
@@ -118,7 +121,6 @@ export const initializeSocket = (io) => {
                     return;
                 }
 
-                // Identify receiver from room
                 const receiverId = participants.find(id => id !== sender._id.toString());
 
                 if (receiverId) {
@@ -133,7 +135,6 @@ export const initializeSocket = (io) => {
                         await conversation.save();
                     }
 
-                    // 3. Create Message
                     const newMessage = new Message({
                         conversationId: conversation._id,
                         sender: sender._id,
@@ -148,7 +149,6 @@ export const initializeSocket = (io) => {
 
                     await newMessage.save();
 
-                    // Update last message
                     conversation.lastMessage = newMessage._id;
                     await conversation.save();
                 }
@@ -179,6 +179,25 @@ export const initializeSocket = (io) => {
             io.in(data.room).emit('receive_message', aiMessageData);
         });
 
+        // Real-time Subtitles for Video Calls
+        socket.on('subtitle_stream', async (data) => {
+            console.log('Received subtitle_stream:', data);
+            // data: { room, text, lang, author }
+            try {
+                const translations = await translateMessage(data.text, data.lang || 'en');
+                console.log('Subtitle translations generated:', translations);
+                const subtitleData = {
+                    ...data,
+                    translations
+                };
+                // Emit to everyone in the room INCLUDING the sender so they can see their own captions
+                io.in(data.room).emit('subtitle_data', subtitleData);
+                console.log('Emitted subtitle_data to entire room (including sender):', data.room);
+            } catch (err) {
+                console.error('Error processing subtitle:', err);
+            }
+        });
+
         // WebRTC Signaling
         socket.on('call_user', (data) => {
             io.to(data.userToCall).emit('call_user', { signal: data.signalData, from: data.from, name: data.name });
@@ -196,8 +215,24 @@ export const initializeSocket = (io) => {
             io.to(data.to).emit('end_call');
         });
 
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             console.log('User Disconnected', socket.id);
+            if (currentUserId) {
+                try {
+                    const User = (await import('../models/User.js')).default;
+                    await User.findByIdAndUpdate(currentUserId, {
+                        isOnline: false,
+                        lastSeen: new Date()
+                    });
+                    io.emit('user_status_change', {
+                        userId: currentUserId,
+                        isOnline: false,
+                        lastSeen: new Date()
+                    });
+                } catch (err) {
+                    console.error('Error updating offline status:', err);
+                }
+            }
         });
     });
 };

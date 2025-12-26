@@ -23,6 +23,30 @@ const verifyToken = (req, res, next) => {
     }
 };
 
+// Middleware to require premium subscription
+const requirePremium = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ detail: 'User not found' });
+        }
+
+        if (!user.isPremium) {
+            return res.status(403).json({
+                detail: 'Premium subscription required',
+                code: 'PREMIUM_REQUIRED'
+            });
+        }
+
+        next();
+    } catch (err) {
+        console.error('Premium check error:', err);
+        res.status(500).json({ detail: 'Failed to verify premium status' });
+    }
+};
+
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -44,7 +68,7 @@ const upload = multer({
 });
 
 // Get chat history with a specific user
-router.get('/history/:friendId', verifyToken, async (req, res) => {
+router.get('/history/:friendId', verifyToken, requirePremium, async (req, res) => {
     try {
         const { friendId } = req.params;
         const userId = req.user.userId;
@@ -84,7 +108,7 @@ router.get('/history/:friendId', verifyToken, async (req, res) => {
 });
 
 // Upload file
-router.post('/upload', verifyToken, upload.single('file'), (req, res) => {
+router.post('/upload', verifyToken, requirePremium, upload.single('file'), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ detail: 'No file uploaded' });

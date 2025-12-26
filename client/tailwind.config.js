@@ -11,29 +11,41 @@ export default {
       },
       colors: {
         primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
+          50: '#fdf4ff',
+          100: '#fae8ff',
+          200: '#f5d0fe',
+          300: '#f0abfc',
+          400: '#e879f9',
+          500: '#d946ef', // Lavender / Fuchsia
+          600: '#c026d3',
+          700: '#a21caf',
+          800: '#86198f',
+          900: '#701a75',
+        },
+        glacier: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9', // Sky Blue / Glacier
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
         },
         dark: {
-          bg: '#020617', // Slate 950 / Deep Void
-          card: '#0f172a', // Slate 900
-          surface: '#1e293b', // Slate 800
-          input: '#1e293b', // Explicit input background
-          text: '#f8fafc', // Slate 50
-          muted: '#94a3b8', // Slate 400
+          bg: '#0f0518', // Deep Midnight Purple
+          card: '#1a0b2e', // Darker Purple
+          surface: '#2e1065', // Deep Violet
+          input: '#2e1065',
+          text: '#f0abfc', // Light Lavender Text
+          muted: '#a78bfa', // Muted Lavender
         }
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-glow': 'conic-gradient(from 180deg at 50% 50%, #1e293b 0deg, #0f172a 180deg, #1e293b 360deg)',
+        'hero-glow': 'conic-gradient(from 180deg at 50% 50%, #1a0b2e 0deg, #0f0518 180deg, #1a0b2e 360deg)',
       },
       boxShadow: {
         'glass': '0 4px 30px rgba(0, 0, 0, 0.1)',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { motion } from 'framer-motion';
-import { Send, Globe, Mic, MicOff, Phone, Video, MessageSquare, Paperclip, FileText, Music } from 'lucide-react';
+import { Send, Globe, Mic, MicOff, Phone, Video, MessageSquare, Paperclip, FileText, Music, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ChatSidebar } from '../components/ChatSidebar';
 import { VideoCall } from '../components/VideoCall';
@@ -36,6 +36,9 @@ interface User {
     id?: string;
     username: string;
     email: string;
+    isOnline?: boolean;
+    lastSeen?: string;
+    isPremium?: boolean;
 }
 
 export const Chat = () => {
@@ -76,7 +79,7 @@ export const Chat = () => {
         return () => { newSocket.disconnect(); };
     }, []);
 
-    // Handle Messages & Calls
+    // Handle Messages, Calls & Status
     useEffect(() => {
         if (!socket) return;
 
@@ -89,16 +92,28 @@ export const Chat = () => {
         });
 
         socket.on('call_user', (data) => {
-            setIncomingCallSignal(data.signal);
-            setIncomingCallFrom({ _id: data.from, username: data.name });
-            setIsVideoCallActive(true);
+            console.log("Incoming call data:", data);
+            if (data.signal && data.from) {
+                setIncomingCallSignal(data.signal);
+                setIncomingCallFrom({ _id: data.from, username: data.name || 'Unknown' });
+                setIsVideoCallActive(true);
+            } else {
+                console.error("Invalid incoming call data:", data);
+            }
+        });
+
+        socket.on('user_status_change', (data: { userId: string, isOnline: boolean, lastSeen?: string }) => {
+            if (selectedFriend && selectedFriend._id === data.userId) {
+                setSelectedFriend(prev => prev ? { ...prev, isOnline: data.isOnline, lastSeen: data.lastSeen } : null);
+            }
         });
 
         return () => {
             socket.off('receive_message');
             socket.off('call_user');
+            socket.off('user_status_change');
         };
-    }, [socket, isCallMode, displayLang, user]);
+    }, [socket, isCallMode, displayLang, user, selectedFriend]);
 
     // Scroll to bottom
     useEffect(() => {
@@ -108,7 +123,11 @@ export const Chat = () => {
     // Join Personal Room for Calls
     useEffect(() => {
         if (user && socket) {
-            socket.emit('join_room', user.id);
+            const userId = user.id || user._id;
+            console.log("Joining personal room:", userId);
+            socket.emit('join_room', userId);
+        } else {
+            console.log("Waiting to join personal room. User:", user, "Socket:", !!socket);
         }
     }, [user, socket]);
 
@@ -124,8 +143,24 @@ export const Chat = () => {
 
             // Fetch History
             fetchHistory(friendId);
+
+            // Fetch latest status
+            fetchFriendStatus(friendId);
         }
-    }, [selectedFriend, user, socket]);
+    }, [selectedFriend?._id, user, socket]); // Only depend on ID change
+
+    const fetchFriendStatus = async (friendId: string) => {
+        try {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/user/${friendId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data) {
+                setSelectedFriend(prev => prev ? { ...prev, isOnline: res.data.isOnline, lastSeen: res.data.lastSeen } : null);
+            }
+        } catch (err) {
+            console.error("Failed to fetch friend status", err);
+        }
+    };
 
     const fetchHistory = async (friendId: string) => {
         try {
@@ -316,9 +351,21 @@ export const Chat = () => {
         }
     };
 
-    return (
-        <div className="w-full max-w-6xl mx-auto h-[85vh] flex bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
+    // Helper to format last seen
+    const formatLastSeen = (dateString?: string) => {
+        if (!dateString) return 'Offline';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now.getTime() - date.getTime();
 
+        if (diff < 60000) return 'Last seen just now';
+        if (diff < 3600000) return `Last seen ${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `Last seen ${Math.floor(diff / 3600000)}h ago`;
+        return `Last seen ${date.toLocaleDateString()}`;
+    };
+
+    return (
+        <div className="w-full max-w-6xl mx-auto h-[calc(100dvh-100px)] md:h-[85vh] flex bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
 
             {/* Video Call Overlay */}
             {isVideoCallActive && socket && user && (selectedFriend || incomingCallFrom) && (
@@ -333,13 +380,15 @@ export const Chat = () => {
                 />
             )}
 
-            {/* Sidebar */}
-            <ChatSidebar onSelectUser={setSelectedFriend} selectedUserId={selectedFriend?._id} />
+            {/* Sidebar - Hidden on mobile when chat is active */}
+            <div className={`${selectedFriend ? 'hidden md:block' : 'w-full md:w-80'} h-full border-r border-white/10`}>
+                <ChatSidebar onSelectUser={setSelectedFriend} selectedUserId={selectedFriend?._id} socket={socket} />
+            </div>
 
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col bg-dark-bg/20">
+            <div className={`flex-1 flex flex-col bg-dark-bg/20 ${!selectedFriend ? 'hidden md:flex' : 'w-full'}`}>
                 {!selectedFriend ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-dark-muted">
+                    <div className="flex-1 flex flex-col items-center justify-center text-dark-muted p-6 text-center">
                         <div className="p-6 bg-white/5 rounded-full mb-4">
                             <MessageSquare className="w-12 h-12 opacity-50" />
                         </div>
@@ -349,18 +398,31 @@ export const Chat = () => {
                 ) : (
                     <>
                         {/* Header */}
-                        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-dark-bg/30">
+                        <div className="p-3 md:p-4 border-b border-white/10 flex items-center justify-between bg-dark-bg/30 backdrop-blur-md sticky top-0 z-10">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                                    {selectedFriend.username[0].toUpperCase()}
+                                <button
+                                    onClick={() => setSelectedFriend(null)}
+                                    className="md:hidden p-2 -ml-2 text-dark-muted hover:text-white"
+                                >
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                                <div className="relative">
+                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base">
+                                        {selectedFriend.username[0].toUpperCase()}
+                                    </div>
+                                    {selectedFriend.isOnline && (
+                                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-dark-bg"></div>
+                                    )}
                                 </div>
                                 <div>
-                                    <h3 className="text-white font-semibold">{selectedFriend.username}</h3>
-                                    <p className="text-xs text-dark-muted">Online</p>
+                                    <h3 className="text-white font-semibold text-sm md:text-base">{selectedFriend.username}</h3>
+                                    <p className="text-[10px] md:text-xs text-dark-muted">
+                                        {selectedFriend.isOnline ? 'Online' : formatLastSeen(selectedFriend.lastSeen)}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 md:gap-2">
                                 <button
                                     onClick={() => {
                                         if (isCallMode) {
@@ -400,28 +462,28 @@ export const Chat = () => {
                                     className={`p-2 rounded-lg transition-all ${isCallMode ? 'bg-green-500 text-white animate-pulse' : 'bg-white/5 text-dark-muted hover:text-white'}`}
                                     title="Voice Call (Translated)"
                                 >
-                                    <Phone className="w-5 h-5" />
+                                    <Phone className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
                                 <button
                                     onClick={startVideoCall}
                                     className="p-2 bg-white/5 text-dark-muted hover:text-white rounded-lg transition-all"
                                     title="Video Call"
                                 >
-                                    <Video className="w-5 h-5" />
+                                    <Video className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
 
-                                <div className="h-6 w-px bg-white/10 mx-2" />
+                                <div className="h-6 w-px bg-white/10 mx-1 md:mx-2" />
 
-                                <div className="flex items-center gap-2 bg-dark-bg/50 rounded-lg p-1 border border-white/5">
-                                    <Globe className="w-4 h-4 text-primary-400 ml-2" />
+                                <div className="flex items-center gap-1 md:gap-2 bg-dark-bg/50 rounded-lg p-1 border border-white/5">
+                                    <Globe className="w-3 h-3 md:w-4 md:h-4 text-primary-400 ml-1" />
                                     <select
                                         value={displayLang}
                                         onChange={(e) => setDisplayLang(e.target.value)}
-                                        className="bg-transparent text-sm text-white border-none focus:ring-0 cursor-pointer py-1 pr-8"
+                                        className="bg-transparent text-xs md:text-sm text-white border-none focus:ring-0 cursor-pointer py-1 pr-6 md:pr-8 max-w-[80px] md:max-w-none"
                                     >
                                         {languages.map((lang) => (
                                             <option key={lang.code} value={lang.code} className="bg-dark-bg text-white">
-                                                View in {lang.name}
+                                                {lang.code.toUpperCase()}
                                             </option>
                                         ))}
                                     </select>
@@ -430,7 +492,7 @@ export const Chat = () => {
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 custom-scrollbar">
                             {messages.map((msg, index) => {
                                 const isMe = msg.author === (user?.email || 'Anonymous');
                                 return (
@@ -441,13 +503,13 @@ export const Chat = () => {
                                         className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div
-                                            className={`max-w-[70%] rounded-2xl p-4 ${isMe
+                                            className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 md:p-4 ${isMe
                                                 ? 'bg-primary-600 text-white rounded-tr-none'
                                                 : 'bg-white/10 text-white rounded-tl-none border border-white/5'
                                                 }`}
                                         >
-                                            <div className="flex items-center gap-2 mb-1 opacity-70 text-xs">
-                                                <span className="font-medium">{msg.author}</span>
+                                            <div className="flex items-center gap-2 mb-1 opacity-70 text-[10px] md:text-xs">
+                                                <span className="font-medium truncate max-w-[100px]">{msg.author}</span>
                                                 <span>•</span>
                                                 <span>{msg.time}</span>
                                             </div>
@@ -462,20 +524,20 @@ export const Chat = () => {
                         </div>
 
                         {/* Input */}
-                        <div className="p-4 border-t border-white/10 bg-dark-bg/30">
+                        <div className="p-3 md:p-4 border-t border-white/10 bg-dark-bg/30 backdrop-blur-md">
                             <form onSubmit={sendMessage} className="flex gap-2 items-center">
-                                <div className="relative">
+                                <div className="relative shrink-0">
                                     <select
                                         value={inputLang}
                                         onChange={(e) => setInputLang(e.target.value)}
-                                        className="appearance-none bg-dark-bg/50 border border-white/10 rounded-xl pl-3 pr-8 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 cursor-pointer text-sm"
+                                        className="appearance-none bg-dark-bg/50 border border-white/10 rounded-xl pl-2 md:pl-3 pr-6 md:pr-8 py-2 md:py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 cursor-pointer text-xs md:text-sm w-16 md:w-auto"
                                     >
                                         <option value="en">EN</option>
                                         <option value="hi">HI</option>
                                         <option value="mr">MR</option>
                                     </select>
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-dark-muted">
-                                        <span className="text-xs">▼</span>
+                                    <div className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 pointer-events-none text-dark-muted">
+                                        <span className="text-[10px] md:text-xs">▼</span>
                                     </div>
                                 </div>
 
@@ -489,39 +551,44 @@ export const Chat = () => {
                                 />
                                 <label
                                     htmlFor="file-upload"
-                                    className={`p-3 rounded-xl transition-all cursor-pointer ${isUploading ? 'bg-white/10 opacity-50 cursor-not-allowed' : 'bg-white/5 text-dark-muted hover:text-white'}`}
+                                    className={`p-2 md:p-3 rounded-xl transition-all cursor-pointer shrink-0 ${isUploading ? 'bg-white/10 opacity-50 cursor-not-allowed' : 'bg-white/5 text-dark-muted hover:text-white'}`}
                                 >
-                                    <Paperclip className="w-5 h-5" />
+                                    <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
                                 </label>
 
                                 <input
                                     type="text"
                                     value={message}
                                     onChange={(e) => setMessage(e.target.value)}
-                                    placeholder={`Type in ${languages.find(l => l.code === inputLang)?.name}...`}
-                                    className="flex-1 bg-dark-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-dark-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all"
+                                    placeholder="Type..."
+                                    className="flex-1 min-w-0 bg-dark-bg/50 border border-white/10 rounded-xl px-3 md:px-4 py-2 md:py-3 text-white placeholder:text-dark-muted/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm"
                                 />
 
-                                <button
-                                    type="button"
-                                    onClick={startListening}
-                                    className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-white/5 text-dark-muted hover:text-white'}`}
-                                >
-                                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                                </button>
+                                {/* Mic Button - Hide when typing on mobile to save space */}
+                                {!message.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={startListening}
+                                        className={`p-2 md:p-3 rounded-xl transition-all shrink-0 ${isListening ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-white/5 text-dark-muted hover:text-white'}`}
+                                    >
+                                        {isListening ? <MicOff className="w-4 h-4 md:w-5 md:h-5" /> : <Mic className="w-4 h-4 md:w-5 md:h-5" />}
+                                    </button>
+                                )}
 
                                 <button
                                     type="submit"
                                     disabled={!message.trim()}
-                                    className="bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all shadow-lg shadow-primary-600/20"
+                                    className={`p-2 md:p-3 rounded-xl transition-all shadow-lg shrink-0 ${!message.trim()
+                                        ? 'bg-white/5 text-dark-muted opacity-50 cursor-not-allowed'
+                                        : 'bg-primary-600 hover:bg-primary-500 text-white shadow-primary-600/20'}`}
                                 >
-                                    <Send className="w-5 h-5" />
+                                    <Send className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
                             </form>
                         </div>
                     </>
                 )}
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };

@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Search, UserPlus, Users, Bell, Check, X } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { Socket } from 'socket.io-client';
 
 interface User {
     _id: string;
     username: string;
     email: string;
+    isOnline?: boolean;
 }
 
 interface FriendRequest {
@@ -18,9 +20,10 @@ interface FriendRequest {
 interface ChatSidebarProps {
     onSelectUser: (user: User) => void;
     selectedUserId?: string;
+    socket: Socket | null;
 }
 
-export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onSelectUser, selectedUserId }) => {
+export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onSelectUser, selectedUserId, socket }) => {
     const { token } = useAuth();
     const [activeTab, setActiveTab] = useState<'chats' | 'search' | 'requests'>('chats');
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,6 +38,23 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onSelectUser, selected
             fetchRequests();
         }
     }, [token]);
+
+    // Listen for status changes
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleStatusChange = (data: { userId: string, isOnline: boolean }) => {
+            setFriends(prev => prev.map(f =>
+                f._id === data.userId ? { ...f, isOnline: data.isOnline } : f
+            ));
+        };
+
+        socket.on('user_status_change', handleStatusChange);
+
+        return () => {
+            socket.off('user_status_change', handleStatusChange);
+        };
+    }, [socket]);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -150,12 +170,19 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onSelectUser, selected
                                     onClick={() => onSelectUser(friend)}
                                     className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${selectedUserId === friend._id ? 'bg-primary-600/20 border border-primary-500/30' : 'hover:bg-white/5 border border-transparent'}`}
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                                        {friend.username[0].toUpperCase()}
+                                    <div className="relative">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                                            {friend.username[0].toUpperCase()}
+                                        </div>
+                                        {friend.isOnline && (
+                                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-dark-bg"></div>
+                                        )}
                                     </div>
                                     <div>
                                         <h3 className="text-white font-medium">{friend.username}</h3>
-                                        <p className="text-xs text-dark-muted">Tap to chat</p>
+                                        <p className="text-xs text-dark-muted">
+                                            {friend.isOnline ? 'Online' : 'Offline'}
+                                        </p>
                                     </div>
                                 </div>
                             ))

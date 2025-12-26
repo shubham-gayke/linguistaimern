@@ -8,6 +8,8 @@ import historyRoutes from './routes/history.js';
 import paymentRoutes from './routes/payment.js';
 import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
+import chatRoutes from './routes/chat.js';
+import aiPracticeRoutes from './routes/aiPractice.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
@@ -16,6 +18,10 @@ import { initializeSocket } from './socket/chat.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ES Module __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors({
@@ -35,30 +41,20 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 // Routes
-import chatRoutes from './routes/chat.js';
-
-// ... (existing imports)
-
-// Routes
 app.use('/auth', authRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/chat', chatRoutes); // New chat routes
+app.use('/api/chat', chatRoutes);
+app.use('/api/ai-practice', aiPracticeRoutes);
 app.use('/', translateRoutes);
-
-// Serve static files from the React app
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Serve uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Assuming client/dist is one level up and then in client/dist
-// Adjust path if you move the server folder
+// Serve static files from the React app
 const clientDistPath = path.join(__dirname, '../../client/dist');
-
 app.use(express.static(clientDistPath));
 
 app.get(/.*/, (req, res) => {
@@ -76,8 +72,8 @@ const io = new Server(httpServer, {
             "http://localhost:3000",
             "http://127.0.0.1:5173",
             "http://127.0.0.1:3000",
-            process.env.CLIENT_URL // Add deployed frontend URL
-        ].filter(Boolean), // Remove undefined if env var is missing
+            process.env.CLIENT_URL
+        ].filter(Boolean),
         methods: ["GET", "POST"]
     }
 });
@@ -85,10 +81,11 @@ const io = new Server(httpServer, {
 initializeSocket(io);
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+    tlsAllowInvalidCertificates: true
+})
     .then(() => {
         console.log('Connected to MongoDB Atlas');
-        // Start Server only after DB connection
         httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });

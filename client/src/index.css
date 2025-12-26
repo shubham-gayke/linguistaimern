@@ -7,6 +7,16 @@
     @apply bg-dark-bg text-dark-text overflow-x-hidden font-sans antialiased;
   }
 
+  input, textarea, select, button {
+    @apply font-sans;
+  }
+
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important; /* Prevent iOS zoom */
+    }
+  }
+
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

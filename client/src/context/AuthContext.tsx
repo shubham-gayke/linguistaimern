@@ -3,10 +3,12 @@ import axios from 'axios';
 
 interface User {
     email: string;
+    username?: string;
     is_verified: boolean;
     id: string;
     isPremium?: boolean;
     subscriptionPlan?: 'monthly' | 'yearly' | null;
+    role?: 'user' | 'admin';
 }
 
 interface AuthContextType {

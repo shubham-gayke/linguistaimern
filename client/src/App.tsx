@@ -1,197 +1,130 @@
-import { motion } from 'framer-motion';
-import { Languages, Sparkles, LogIn, UserPlus, LogOut, MessageSquare, Crown, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { TranslationCard } from './components/TranslationCard';
 import { Background } from './components/Background';
-import { Signup } from './pages/Signup';
-import { Login } from './pages/Login';
-import { ForgotPassword } from './pages/ForgotPassword';
+import { LoadingScreen } from './components/LoadingScreen';
 import { Chat } from './pages/Chat';
-import { Pricing } from './pages/Pricing';
+import { AIPractice } from './pages/AIPractice';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { Pricing } from './pages/Pricing';
+import { Toaster } from 'react-hot-toast';
+import { AnimatePresence } from 'framer-motion';
 
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  // Since loading is not exposed in AuthContext, we rely on isAuthenticated or user presence
+  // Ideally AuthContext should expose a loading state, but for now we'll assume if token exists but user is null, we might be loading.
+  // However, the current AuthContext implementation doesn't strictly expose a loading state.
+  // We will just check if user is authenticated.
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
 
-const ProtectedChatRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAuthenticated } = useAuth();
+// Premium Route - requires both authentication AND premium subscription
+const PremiumRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, user } = useAuth();
 
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
 
+  // Check if user has premium subscription
   if (!user?.isPremium) {
     return <Navigate to="/pricing" />;
   }
 
-  return children;
+  return <>{children}</>;
 };
 
-function MainApp() {
-  const { user, logout, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const isPremium = user?.isPremium;
+// AdminRoute removed as 'role' is not on User interface currently.
+// If needed, we can add it back once User interface is updated.
+
+import { Navbar } from './components/Navbar';
+import { BackButton } from './components/BackButton';
+
+function AppContent() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate initial loading for "Server Waking Up"
+  useEffect(() => {
+    // Check if we've already shown the loading screen this session
+    const hasLoaded = sessionStorage.getItem('hasLoaded');
+    if (hasLoaded) {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
+    sessionStorage.setItem('hasLoaded', 'true');
+  };
+
+  if (isLoading) {
+    return <LoadingScreen onComplete={handleLoadingComplete} />;
+  }
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text relative overflow-hidden font-sans selection:bg-primary-500/30 selection:text-primary-400">
-      {/* Animated Background */}
+    <div className="relative min-h-screen text-dark-text overflow-hidden selection:bg-primary-500/30 bg-dark-bg">
       <Background />
 
-      <div className="container mx-auto px-4 py-8 relative z-10 flex flex-col min-h-screen">
-        <header className="flex items-center justify-between mb-12 md:mb-16 pointer-events-auto">
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="flex items-center gap-3 group cursor-pointer"
-            onClick={() => navigate('/')}
-          >
-            <div className="relative p-2">
-              <div className="absolute inset-0 bg-primary-500/20 rounded-lg blur-md group-hover:blur-xl transition-all duration-500" />
-              <div className="relative p-2 rounded-lg bg-white/5 border border-white/10 backdrop-blur-md">
-                <Languages className="w-6 h-6 text-primary-400 group-hover:text-white transition-colors" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white relative">
-              Linguist<span className="text-primary-400">AI</span>
-              <Sparkles className="w-4 h-4 text-primary-400 absolute -top-1 -right-4 animate-pulse" />
-            </h1>
-          </motion.div>
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Navbar />
+        <BackButton />
 
-          <div className="flex items-center gap-4">
-            {isAuthenticated ? (
-              <div className="flex items-center gap-4">
-                {user?.email === 'shubhamgayke9168@gmail.com' && (
-                  <Link to="/admin">
-                    <button className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4" />
-                      <span className="hidden md:inline">Admin</span>
-                    </button>
-                  </Link>
-                )}
-
-                {!isPremium && (
-                  <Link to="/pricing">
-                    <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-200 border border-yellow-500/30 hover:border-yellow-500/50 transition-all flex items-center gap-2">
-                      <Crown className="w-4 h-4" />
-                      <span className="hidden md:inline">Upgrade</span>
-                    </button>
-                  </Link>
-                )}
-
-                <Link to="/chat">
-                  <button className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${isPremium
-                    ? 'bg-primary-600/20 text-primary-300 border border-primary-500/50 shadow-[0_0_15px_rgba(139,92,246,0.3)]'
-                    : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
-                    }`}>
-                    <MessageSquare className="w-4 h-4" />
-                    Chat Room
-                  </button>
-                </Link>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-dark-muted text-sm hidden md:block">
-                    {user?.email}
-                  </span>
-                  {isPremium && (
-                    <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Crown className="w-3 h-3" /> PRO
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  onClick={logout}
-                  className="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link to="/login">
-                  <button className="px-4 py-2 rounded-lg text-dark-muted hover:text-white hover:bg-white/5 transition-all flex items-center gap-2">
-                    <LogIn className="w-4 h-4" />
-                    Login
-                  </button>
-                </Link>
-                <Link to="/signup">
-                  <button className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium transition-all shadow-lg shadow-primary-600/20 flex items-center gap-2">
-                    <UserPlus className="w-4 h-4" />
-                    Sign Up
-                  </button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </header>
-
-        <Routes>
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route
-            path="/chat"
-            element={
-              <ProtectedChatRoute>
-                <Chat />
-              </ProtectedChatRoute>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <main className="flex-grow flex flex-col items-center justify-center max-w-6xl mx-auto w-full pointer-events-auto">
-                <motion.div
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, delay: 0.2, type: "spring" }}
-                  className="text-center mb-16 relative"
-                >
-                  {/* Text Glow Effect */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary-500/20 blur-[100px] -z-10 rounded-full opacity-0 animate-pulse-slow" />
-
-                  <h2 className="text-5xl md:text-7xl font-bold mb-8 leading-tight text-white tracking-tight drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]">
-                    <motion.span
-                      initial={{ opacity: 0, filter: "blur(10px)" }}
-                      animate={{ opacity: 1, filter: "blur(0px)" }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="block"
-                    >
-                      Break Language Barriers
-                    </motion.span>
-                    <motion.span
-                      initial={{ opacity: 0, filter: "blur(10px)" }}
-                      animate={{ opacity: 1, filter: "blur(0px)" }}
-                      transition={{ duration: 0.8, delay: 0.8 }}
-                      className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 via-white to-primary-600 animate-gradient-x"
-                    >
-                      with Generative AI
-                    </motion.span>
-                  </h2>
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 1, delay: 1.2 }}
-                    className="text-dark-muted text-xl max-w-2xl mx-auto font-light leading-relaxed backdrop-blur-sm py-2 rounded-xl"
-                  >
-                    Seamless translation between English, Hindi, and Marathi with advanced dialect adaptation.
-                  </motion.p>
-                </motion.div>
-
-                {/* Translation Component */}
-                <TranslationCard />
-              </main>
-            }
-          />
-        </Routes>
-
-        <footer className="mt-20 py-8 border-t border-white/5 text-center backdrop-blur-sm pointer-events-auto">
-          <p className="text-dark-muted text-sm font-medium hover:text-white transition-colors cursor-default">
-            All rights reserved Shubham Gayke 2025
-          </p>
-        </footer>
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+          <AnimatePresence mode="wait">
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              {/* ResetPassword route removed as file is missing */}
+              <Route
+                path="/"
+                element={<TranslationCard />}
+              />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route
+                path="/chat"
+                element={
+                  <PremiumRoute>
+                    <Chat />
+                  </PremiumRoute>
+                }
+              />
+              <Route
+                path="/ai-practice"
+                element={
+                  <PremiumRoute>
+                    <AIPractice />
+                  </PremiumRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute>
+                    <AdminDashboard />
+                  </PrivateRoute>
+                }
+              />
+              {/* Payment routes removed as files are missing */}
+            </Routes>
+          </AnimatePresence>
+        </main>
       </div>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: '#1e293b',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.1)',
+          },
+        }}
+      />
     </div>
   );
 }
@@ -200,7 +133,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <MainApp />
+        <AppContent />
       </AuthProvider>
     </Router>
   );

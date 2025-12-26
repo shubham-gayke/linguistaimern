@@ -342,7 +342,7 @@ export const TranslationCard = () => {
                 initial={{ opacity: 0, rotateX: 20, y: 100 }}
                 animate={{ opacity: 1, rotateX: 0, y: 0 }}
                 transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
-                className="glass-card p-6 md:p-10 relative overflow-hidden holographic-border"
+                className="glass-card p-4 md:p-10 relative overflow-hidden holographic-border"
             >
                 {/* Holographic Sheen */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-white/5 pointer-events-none" />
@@ -466,7 +466,7 @@ export const TranslationCard = () => {
                                             onChangeText={(text) => setInputText(text)}
                                             lang={sourceLang}
                                             placeholder="Enter text here... (Type in English to transliterate)"
-                                            className="w-full h-80 bg-dark-input backdrop-blur-md border border-white/10 rounded-xl p-6 resize-none focus:outline-none focus:border-primary-500/50 focus:bg-dark-input/80 transition-all text-lg placeholder-dark-muted font-normal leading-relaxed text-white shadow-inner"
+                                            className="w-full h-60 md:h-80 bg-dark-input backdrop-blur-md border border-white/10 rounded-xl p-4 md:p-6 resize-none focus:outline-none focus:border-primary-500/50 focus:bg-dark-input/80 transition-all text-base md:text-lg placeholder-dark-muted font-normal leading-relaxed text-white shadow-inner"
                                             containerClassName="w-full h-full"
                                         />
                                     ) : (
@@ -474,7 +474,7 @@ export const TranslationCard = () => {
                                             value={inputText}
                                             onChange={(e) => setInputText(e.target.value)}
                                             placeholder="Enter text here..."
-                                            className="w-full h-80 bg-dark-input backdrop-blur-md border border-white/10 rounded-xl p-6 resize-none focus:outline-none focus:border-primary-500/50 focus:bg-dark-input/80 transition-all text-lg placeholder-dark-muted font-normal leading-relaxed text-white shadow-inner"
+                                            className="w-full h-60 md:h-80 bg-dark-input backdrop-blur-md border border-white/10 rounded-xl p-4 md:p-6 resize-none focus:outline-none focus:border-primary-500/50 focus:bg-dark-input/80 transition-all text-base md:text-lg placeholder-dark-muted font-normal leading-relaxed text-white shadow-inner"
                                         />
                                     )}
                                     <div className="absolute bottom-4 right-4 text-xs text-dark-muted font-mono bg-black/20 px-2 py-1 rounded backdrop-blur-sm">
@@ -543,7 +543,7 @@ export const TranslationCard = () => {
                     </div>
 
                     <div className="relative group">
-                        <div className="w-full h-80 bg-dark-card/30 backdrop-blur-md border border-white/10 rounded-xl p-6 relative overflow-hidden flex flex-col shadow-inner transition-all duration-500 group-hover:bg-dark-card/40">
+                        <div className="w-full h-60 md:h-80 bg-dark-card/30 backdrop-blur-md border border-white/10 rounded-xl p-4 md:p-6 relative overflow-hidden flex flex-col shadow-inner transition-all duration-500 group-hover:bg-dark-card/40">
                             <AnimatePresence>
                                 {isLoading && (
                                     <motion.div
@@ -630,19 +630,19 @@ export const TranslationCard = () => {
                 </div>
 
                 {/* Action Button */}
-                <div className="mt-10 flex justify-center relative z-10">
+                <div className="mt-8 md:mt-10 flex justify-center relative z-10">
                     <motion.button
                         whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(139,92,246,0.4)" }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleTranslate}
                         disabled={isLoading || (activeTab === 'text' && !inputText) || (activeTab === 'document' && !selectedFile)}
-                        className="group relative px-10 py-5 bg-transparent rounded-full font-bold text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative px-8 py-4 md:px-10 md:py-5 bg-transparent rounded-full font-bold text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-primary-600 via-primary-500 to-primary-600 opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
                         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                         <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
 
-                        <span className="relative flex items-center gap-3 text-lg tracking-wide">
+                        <span className="relative flex items-center justify-center gap-3 text-base md:text-lg tracking-wide">
                             <Sparkles className="w-5 h-5 animate-pulse" />
                             TRANSLATE NOW
                         </span>
