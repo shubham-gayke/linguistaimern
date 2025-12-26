@@ -6,6 +6,7 @@ interface User {
     username?: string;
     is_verified: boolean;
     id: string;
+    _id?: string;
     isPremium?: boolean;
     subscriptionPlan?: 'monthly' | 'yearly' | null;
     role?: 'user' | 'admin';

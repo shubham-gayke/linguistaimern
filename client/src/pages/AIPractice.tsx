@@ -41,7 +41,6 @@ export const AIPractice = () => {
     const [language, setLanguage] = useState('en');
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [isSpeaking, setIsSpeaking] = useState(false);
     const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -273,8 +272,8 @@ export const AIPractice = () => {
                             >
                                 {/* Avatar */}
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${message.role === 'user'
-                                        ? 'bg-primary-600'
-                                        : 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                                    ? 'bg-primary-600'
+                                    : 'bg-gradient-to-br from-emerald-500 to-teal-600'
                                     }`}>
                                     {message.role === 'user' ? (
                                         <User className="w-5 h-5 text-white" />
@@ -286,8 +285,8 @@ export const AIPractice = () => {
                                 {/* Message Bubble */}
                                 <div className={`max-w-[75%] ${message.role === 'user' ? 'text-right' : ''}`}>
                                     <div className={`rounded-2xl px-4 py-3 ${message.role === 'user'
-                                            ? 'bg-primary-600 text-white rounded-tr-none'
-                                            : 'bg-white/10 text-white rounded-tl-none border border-white/5'
+                                        ? 'bg-primary-600 text-white rounded-tr-none'
+                                        : 'bg-white/10 text-white rounded-tl-none border border-white/5'
                                         }`}>
                                         <p className="text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
                                     </div>
@@ -297,8 +296,8 @@ export const AIPractice = () => {
                                         <button
                                             onClick={() => speakMessage(message.content, message.id)}
                                             className={`mt-2 p-2 rounded-lg transition-all ${speakingMessageId === message.id
-                                                    ? 'bg-primary-500 text-white'
-                                                    : 'bg-white/5 text-dark-muted hover:text-white hover:bg-white/10'
+                                                ? 'bg-primary-500 text-white'
+                                                : 'bg-white/5 text-dark-muted hover:text-white hover:bg-white/10'
                                                 }`}
                                             title={speakingMessageId === message.id ? 'Stop speaking' : 'Listen'}
                                         >
@@ -340,8 +339,8 @@ export const AIPractice = () => {
                             type="button"
                             onClick={toggleListening}
                             className={`p-3 rounded-xl transition-all shrink-0 ${isListening
-                                    ? 'bg-red-500 text-white animate-pulse'
-                                    : 'bg-white/5 text-dark-muted hover:text-white hover:bg-white/10'
+                                ? 'bg-red-500 text-white animate-pulse'
+                                : 'bg-white/5 text-dark-muted hover:text-white hover:bg-white/10'
                                 }`}
                             title={isListening ? 'Stop listening' : 'Speak'}
                         >
@@ -361,8 +360,8 @@ export const AIPractice = () => {
                             type="submit"
                             disabled={!input.trim() || isLoading}
                             className={`p-3 rounded-xl transition-all shrink-0 ${!input.trim() || isLoading
-                                    ? 'bg-white/5 text-dark-muted opacity-50 cursor-not-allowed'
-                                    : 'bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-600/20'
+                                ? 'bg-white/5 text-dark-muted opacity-50 cursor-not-allowed'
+                                : 'bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-600/20'
                                 }`}
                         >
                             <Send className="w-5 h-5" />

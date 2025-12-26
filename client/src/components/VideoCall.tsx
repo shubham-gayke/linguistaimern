@@ -25,7 +25,7 @@ const ICE_SERVERS = {
     iceCandidatePoolSize: 10 // Pre-fetch ICE candidates for faster connection
 };
 
-export const VideoCall: React.FC<VideoCallProps> = ({ socket, room, user, friend, onEndCall, isIncoming, incomingSignal }) => {
+export const VideoCall: React.FC<VideoCallProps> = ({ socket, room: _room, user, friend, onEndCall, isIncoming, incomingSignal }) => {
     console.log("VideoCall rendering. User:", user?.id, "Friend:", friend?._id, "Incoming:", isIncoming);
 
     const [callAccepted, setCallAccepted] = useState(false);
