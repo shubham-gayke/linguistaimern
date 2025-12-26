@@ -174,7 +174,6 @@ export const AIPractice = () => {
         // If already speaking this message, stop
         if (speakingMessageId === messageId) {
             window.speechSynthesis.cancel();
-            setIsSpeaking(false);
             setSpeakingMessageId(null);
             return;
         }
@@ -193,17 +192,14 @@ export const AIPractice = () => {
         if (voice) utterance.voice = voice;
 
         utterance.onstart = () => {
-            setIsSpeaking(true);
             setSpeakingMessageId(messageId);
         };
 
         utterance.onend = () => {
-            setIsSpeaking(false);
             setSpeakingMessageId(null);
         };
 
         utterance.onerror = () => {
-            setIsSpeaking(false);
             setSpeakingMessageId(null);
         };
 
