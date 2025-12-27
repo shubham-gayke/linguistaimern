@@ -19,7 +19,7 @@ if (!process.env.MAIL_HOST || !process.env.MAIL_PORT) {
 const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port: process.env.MAIL_PORT,
-    secure: false, // true for 465, false for other ports
+    secure: process.env.MAIL_PORT == 465, // true for 465, false for other ports
     auth: {
         user: process.env.MAIL_USERNAME,
         pass: process.env.MAIL_PASSWORD
@@ -74,7 +74,8 @@ router.post('/signup-step1', async (req, res) => {
             if (emailError.code === 'ECONNREFUSED') {
                 return res.status(500).json({ detail: 'Failed to connect to email server. Please check server configuration (MAIL_HOST, MAIL_PORT).' });
             }
-            return res.status(500).json({ detail: 'Failed to send OTP email. Please try again later.' });
+            // Return the actual error message for debugging
+            return res.status(500).json({ detail: `Email Error: ${emailError.message}` });
         }
 
         res.json({ message: 'OTP sent to email' });
