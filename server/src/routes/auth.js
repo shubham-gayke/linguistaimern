@@ -11,16 +11,14 @@ const router = express.Router();
 // OTP Storage moved to Database
 
 // Email Transporter
+// Email Transporter (Brevo SMTP)
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // use STARTTLS
+    host: process.env.MAIL_HOST,
+    port: process.env.MAIL_PORT,
+    secure: false, // true for 465, false for other ports
     auth: {
         user: process.env.MAIL_USERNAME,
         pass: process.env.MAIL_PASSWORD
-    },
-    tls: {
-        rejectUnauthorized: false // Helps with some self-signed cert issues in dev/test
     }
 });
 
@@ -57,17 +55,15 @@ router.post('/signup-step1', async (req, res) => {
         }
 
         await user.save();
-        console.error(`[DEBUG] OTP for ${email}: ${otp}`);
 
-        // Send email asynchronously (don't await) to prevent blocking
-        transporter.sendMail({
+        // Send OTP via Email
+        await transporter.sendMail({
             from: process.env.MAIL_FROM,
             to: email,
-            subject: 'LinguistAI - Verify your email',
-            text: `Your verification code is: ${otp}`
-        }).catch(err => console.error("Email sending failed:", err));
+            subject: 'LinguistAI - Signup OTP',
+            text: `Your OTP for signup is: ${otp}`
+        });
 
-        // Return success immediately
         res.json({ message: 'OTP sent to email' });
     } catch (error) {
         res.status(500).json({ detail: error.message });
