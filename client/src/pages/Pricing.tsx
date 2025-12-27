@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Crown, Loader2, X, QrCode } from 'lucide-react';
+import { Check, Crown, Loader2, X, QrCode, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+// Declare Razorpay type for TypeScript
+declare global {
+    interface Window {
+        Razorpay: any;
+    }
+}
 
 const PricingCard = ({
     title,
@@ -66,8 +73,10 @@ export const Pricing = () => {
     const navigate = useNavigate();
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly' | null>(null);
     const [showModal, setShowModal] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'upi'>('razorpay');
     const [transactionId, setTransactionId] = useState('');
     const [verifying, setVerifying] = useState(false);
+    const [processingRazorpay, setProcessingRazorpay] = useState(false);
     const [pricing, setPricing] = useState({
         monthly_price: 199,
         yearly_price: 799,
@@ -90,7 +99,76 @@ export const Pricing = () => {
         setShowModal(true);
     };
 
-    const handleSubmitPayment = async (e: React.FormEvent) => {
+    const handleRazorpayPayment = async () => {
+        if (!selectedPlan || !user) return;
+
+        setProcessingRazorpay(true);
+        try {
+            // Create order on backend
+            const orderRes = await axios.post(`${import.meta.env.VITE_API_URL}/api/payment/create-order`, {
+                email: user.email,
+                plan: selectedPlan
+            });
+
+            const { orderId, amount, currency, keyId } = orderRes.data;
+
+            // Open Razorpay checkout
+            const options = {
+                key: keyId,
+                amount: amount,
+                currency: currency,
+                name: 'LinguistAI',
+                description: `${selectedPlan === 'monthly' ? 'Monthly' : 'Yearly'} Premium Subscription`,
+                order_id: orderId,
+                handler: async (response: any) => {
+                    try {
+                        // Verify payment on backend
+                        const verifyRes = await axios.post(`${import.meta.env.VITE_API_URL}/api/payment/verify`, {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            email: user.email,
+                            plan: selectedPlan
+                        });
+
+                        if (verifyRes.data.success) {
+                            await refreshUser();
+                            alert("✅ Payment Successful! Welcome to Premium.");
+                            setShowModal(false);
+                            navigate('/chat');
+                        } else {
+                            alert("❌ Payment verification failed. Please contact support.");
+                        }
+                    } catch (error: any) {
+                        console.error("Verification error:", error);
+                        alert("❌ Payment verification failed: " + (error.response?.data?.detail || error.message));
+                    }
+                },
+                prefill: {
+                    email: user.email
+                },
+                theme: {
+                    color: '#8B5CF6'
+                },
+                modal: {
+                    ondismiss: () => {
+                        setProcessingRazorpay(false);
+                    }
+                }
+            };
+
+            const razorpay = new window.Razorpay(options);
+            razorpay.open();
+
+        } catch (error: any) {
+            console.error("Razorpay error:", error);
+            alert(error.response?.data?.detail || "Failed to initiate payment. Please try again.");
+        } finally {
+            setProcessingRazorpay(false);
+        }
+    };
+
+    const handleSubmitUPIPayment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!transactionId.trim()) return;
 
@@ -107,7 +185,6 @@ export const Pricing = () => {
                 setShowModal(false);
                 setTransactionId('');
             } else {
-                // Should not happen with new flow, but fallback
                 await refreshUser();
                 alert("✅ Payment Verified! Welcome to Premium.");
                 navigate('/chat');
@@ -182,48 +259,106 @@ export const Pricing = () => {
                                 <X className="w-6 h-6" />
                             </button>
 
-                            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                                <QrCode className="text-primary-400" />
-                                Scan to Pay
+                            <h3 className="text-2xl font-bold text-white mb-6">
+                                Complete Payment
                             </h3>
 
-                            <div className="bg-white p-4 rounded-xl mb-6 flex flex-col items-center">
-                                {/* Real QR Code */}
-                                <div className="w-64 h-auto bg-white flex items-center justify-center mb-4 rounded-lg overflow-hidden">
-                                    <img
-                                        src="/upi-qr.png"
-                                        alt="Payment QR Code"
-                                        className="w-full h-full object-contain"
-                                    />
-                                </div>
-                                <p className="text-gray-800 font-medium text-center">
-                                    UPI ID: <span className="font-bold select-all">9168469745@ibl</span>
+                            {/* Payment Method Toggle */}
+                            <div className="flex gap-2 mb-6">
+                                <button
+                                    onClick={() => setPaymentMethod('razorpay')}
+                                    className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${paymentMethod === 'razorpay'
+                                        ? 'bg-primary-600 text-white'
+                                        : 'bg-white/10 text-dark-muted hover:bg-white/20'
+                                        }`}
+                                >
+                                    <CreditCard className="w-5 h-5" />
+                                    Razorpay
+                                </button>
+                                <button
+                                    onClick={() => setPaymentMethod('upi')}
+                                    className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${paymentMethod === 'upi'
+                                        ? 'bg-primary-600 text-white'
+                                        : 'bg-white/10 text-dark-muted hover:bg-white/20'
+                                        }`}
+                                >
+                                    <QrCode className="w-5 h-5" />
+                                    UPI Manual
+                                </button>
+                            </div>
+
+                            {/* Amount Display */}
+                            <div className="bg-white/5 rounded-xl p-4 mb-6 text-center">
+                                <p className="text-dark-muted text-sm mb-1">
+                                    {selectedPlan === 'monthly' ? 'Monthly' : 'Yearly'} Plan
                                 </p>
-                                <p className="text-primary-600 font-bold mt-2 text-lg">
-                                    Amount: {selectedPlan === 'monthly' ? `₹${pricing.monthly_price}` : `₹${pricing.yearly_price}`}
+                                <p className="text-3xl font-bold text-primary-400">
+                                    ₹{selectedPlan === 'monthly' ? pricing.monthly_price : pricing.yearly_price}
                                 </p>
                             </div>
 
-                            <form onSubmit={handleSubmitPayment} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm text-dark-muted mb-1">Transaction ID / UTR</label>
-                                    <input
-                                        type="text"
-                                        value={transactionId}
-                                        onChange={(e) => setTransactionId(e.target.value)}
-                                        placeholder="Enter Transaction ID (e.g., 1234567890)"
-                                        className="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
-                                        required
-                                    />
+                            {paymentMethod === 'razorpay' ? (
+                                /* Razorpay Payment */
+                                <div className="space-y-4">
+                                    <p className="text-dark-muted text-sm text-center">
+                                        Pay securely using Credit/Debit Card, UPI, Net Banking, or Wallets
+                                    </p>
+                                    <button
+                                        onClick={handleRazorpayPayment}
+                                        disabled={processingRazorpay}
+                                        className="w-full bg-primary-600 hover:bg-primary-500 text-white py-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
+                                    >
+                                        {processingRazorpay ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <CreditCard className="w-5 h-5" />
+                                                Pay with Razorpay
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={verifying}
-                                    className="w-full bg-primary-600 hover:bg-primary-500 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2"
-                                >
-                                    {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify Payment'}
-                                </button>
-                            </form>
+                            ) : (
+                                /* UPI Manual Payment */
+                                <div>
+                                    <div className="bg-white p-4 rounded-xl mb-6 flex flex-col items-center">
+                                        <div className="w-48 h-auto bg-white flex items-center justify-center mb-4 rounded-lg overflow-hidden">
+                                            <img
+                                                src="/upi-qr.png"
+                                                alt="Payment QR Code"
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                        <p className="text-gray-800 font-medium text-center text-sm">
+                                            UPI ID: <span className="font-bold select-all">9168469745@ibl</span>
+                                        </p>
+                                    </div>
+
+                                    <form onSubmit={handleSubmitUPIPayment} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm text-dark-muted mb-1">Transaction ID / UTR</label>
+                                            <input
+                                                type="text"
+                                                value={transactionId}
+                                                onChange={(e) => setTransactionId(e.target.value)}
+                                                placeholder="Enter Transaction ID (e.g., 1234567890)"
+                                                className="w-full bg-black border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
+                                                required
+                                            />
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            disabled={verifying}
+                                            className="w-full bg-primary-600 hover:bg-primary-500 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2"
+                                        >
+                                            {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Submit for Verification'}
+                                        </button>
+                                        <p className="text-xs text-dark-muted text-center">
+                                            Manual payments are verified within 1-2 hours
+                                        </p>
+                                    </form>
+                                </div>
+                            )}
                         </motion.div>
                     </div>
                 )}
@@ -231,3 +366,4 @@ export const Pricing = () => {
         </div>
     );
 };
+
