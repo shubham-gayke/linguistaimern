@@ -12,6 +12,10 @@ const router = express.Router();
 
 // Email Transporter
 // Email Transporter (Brevo SMTP)
+if (!process.env.MAIL_HOST || !process.env.MAIL_PORT) {
+    console.warn('⚠️  WARNING: Email configuration (MAIL_HOST, MAIL_PORT) is missing. Email sending will fail.');
+}
+
 const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port: process.env.MAIL_PORT,
@@ -57,15 +61,25 @@ router.post('/signup-step1', async (req, res) => {
         await user.save();
 
         // Send OTP via Email
-        await transporter.sendMail({
-            from: process.env.MAIL_FROM,
-            to: email,
-            subject: 'LinguistAI - Signup OTP',
-            text: `Your OTP for signup is: ${otp}`
-        });
+        try {
+            await transporter.sendMail({
+                from: process.env.MAIL_FROM,
+                to: email,
+                subject: 'LinguistAI - Signup OTP',
+                text: `Your OTP for signup is: ${otp}`
+            });
+        } catch (emailError) {
+            console.error("Email sending failed:", emailError);
+            // If it's a connection error, give a specific hint
+            if (emailError.code === 'ECONNREFUSED') {
+                return res.status(500).json({ detail: 'Failed to connect to email server. Please check server configuration (MAIL_HOST, MAIL_PORT).' });
+            }
+            return res.status(500).json({ detail: 'Failed to send OTP email. Please try again later.' });
+        }
 
         res.json({ message: 'OTP sent to email' });
     } catch (error) {
+        console.error("Signup error:", error);
         res.status(500).json({ detail: error.message });
     }
 });
