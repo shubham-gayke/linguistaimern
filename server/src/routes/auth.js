@@ -12,7 +12,9 @@ const router = express.Router();
 
 // Email Transporter
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // use SSL
     auth: {
         user: process.env.MAIL_USERNAME,
         pass: process.env.MAIL_PASSWORD
@@ -54,17 +56,15 @@ router.post('/signup-step1', async (req, res) => {
         await user.save();
         console.error(`[DEBUG] OTP for ${email}: ${otp}`);
 
-        try {
-            await transporter.sendMail({
-                from: process.env.MAIL_FROM,
-                to: email,
-                subject: 'LinguistAI - Verify your email',
-                text: `Your verification code is: ${otp}`
-            });
-        } catch (emailError) {
-            console.error("Email sending failed:", emailError);
-        }
+        // Send email asynchronously (don't await) to prevent blocking
+        transporter.sendMail({
+            from: process.env.MAIL_FROM,
+            to: email,
+            subject: 'LinguistAI - Verify your email',
+            text: `Your verification code is: ${otp}`
+        }).catch(err => console.error("Email sending failed:", err));
 
+        // Return success immediately
         res.json({ message: 'OTP sent to email' });
     } catch (error) {
         res.status(500).json({ detail: error.message });
