@@ -61,6 +61,7 @@ router.post('/signup-step1', async (req, res) => {
         await user.save();
 
         // Send OTP via Email
+        console.log(`[DEBUG] Attempting to send email using Host: ${process.env.MAIL_HOST}, Port: ${process.env.MAIL_PORT}, Secure: ${process.env.MAIL_PORT == 465}`);
         try {
             await transporter.sendMail({
                 from: process.env.MAIL_FROM,
