@@ -17,6 +17,9 @@ const sendEmail = async (to, subject, text) => {
         throw new Error("Server configuration error: Missing Email API Key");
     }
 
+    const senderEmail = process.env.MAIL_FROM || 'noreply@linguistai.com';
+    console.log(`[DEBUG] Attempting to send email from: ${senderEmail} to: ${to}`);
+
     try {
         const response = await fetch('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
@@ -26,16 +29,19 @@ const sendEmail = async (to, subject, text) => {
                 'content-type': 'application/json'
             },
             body: JSON.stringify({
-                sender: { email: process.env.MAIL_FROM || 'noreply@linguistai.com' },
+                sender: { email: senderEmail },
                 to: [{ email: to }],
                 subject: subject,
                 textContent: text
             })
         });
 
+        const responseData = await response.json();
+        console.log(`[DEBUG] Brevo Response Status: ${response.status}`);
+        console.log(`[DEBUG] Brevo Response Body:`, JSON.stringify(responseData, null, 2));
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Brevo API Error: ${JSON.stringify(errorData)}`);
+            throw new Error(`Brevo API Error: ${JSON.stringify(responseData)}`);
         }
         console.log(`✅ Email sent successfully to ${to}`);
     } catch (error) {
