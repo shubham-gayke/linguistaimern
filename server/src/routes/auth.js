@@ -10,21 +10,39 @@ const router = express.Router();
 // OTP Storage (In-memory for simplicity, use Redis in production)
 // OTP Storage moved to Database
 
-// Email Transporter
-// Email Transporter (Brevo SMTP)
-if (!process.env.MAIL_HOST || !process.env.MAIL_PORT) {
-    console.warn('⚠️  WARNING: Email configuration (MAIL_HOST, MAIL_PORT) is missing. Email sending will fail.');
-}
-
-const transporter = nodemailer.createTransport({
-    host: process.env.MAIL_HOST,
-    port: process.env.MAIL_PORT,
-    secure: process.env.MAIL_PORT == 465, // true for 465, false for other ports
-    auth: {
-        user: process.env.MAIL_USERNAME,
-        pass: process.env.MAIL_PASSWORD
+// Email Sending Helper (Brevo API)
+const sendEmail = async (to, subject, text) => {
+    if (!process.env.BREVO_API_KEY) {
+        console.error("❌ BREVO_API_KEY is missing in environment variables.");
+        throw new Error("Server configuration error: Missing Email API Key");
     }
-});
+
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { email: process.env.MAIL_FROM || 'noreply@linguistai.com' },
+                to: [{ email: to }],
+                subject: subject,
+                textContent: text
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Brevo API Error: ${JSON.stringify(errorData)}`);
+        }
+        console.log(`✅ Email sent successfully to ${to}`);
+    } catch (error) {
+        console.error("❌ Failed to send email:", error.message);
+        throw error;
+    }
+};
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -61,21 +79,10 @@ router.post('/signup-step1', async (req, res) => {
         await user.save();
 
         // Send OTP via Email
-        console.log(`[DEBUG] Attempting to send email using Host: ${process.env.MAIL_HOST}, Port: ${process.env.MAIL_PORT}, Secure: ${process.env.MAIL_PORT == 465}`);
         try {
-            await transporter.sendMail({
-                from: process.env.MAIL_FROM,
-                to: email,
-                subject: 'LinguistAI - Signup OTP',
-                text: `Your OTP for signup is: ${otp}`
-            });
+            await sendEmail(email, 'LinguistAI - Signup OTP', `Your OTP for signup is: ${otp}`);
         } catch (emailError) {
             console.error("Email sending failed:", emailError);
-            // If it's a connection error, give a specific hint
-            if (emailError.code === 'ECONNREFUSED') {
-                return res.status(500).json({ detail: 'Failed to connect to email server. Please check server configuration (MAIL_HOST, MAIL_PORT).' });
-            }
-            // Return the actual error message for debugging
             return res.status(500).json({ detail: `Email Error: ${emailError.message}` });
         }
 
@@ -222,12 +229,7 @@ router.post('/forgot-password', async (req, res) => {
         console.error(`[DEBUG] Reset OTP for ${email}: ${otp}`);
 
         try {
-            await transporter.sendMail({
-                from: process.env.MAIL_FROM,
-                to: email,
-                subject: 'LinguistAI - Password Reset',
-                text: `Your password reset code is: ${otp}`
-            });
+            await sendEmail(email, 'LinguistAI - Password Reset', `Your password reset code is: ${otp}`);
         } catch (emailError) {
             console.error("Email sending failed:", emailError);
             return res.status(500).json({ detail: 'Failed to send email' });
