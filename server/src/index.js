@@ -50,6 +50,25 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/ai-practice', aiPracticeRoutes);
 app.use('/', translateRoutes);
 
+// Health Check Route
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+// Keep-alive mechanism for Render free tier
+const SERVER_URL = process.env.SERVER_URL;
+if (SERVER_URL) {
+    // Ping every 9 minutes (9 * 60 * 1000 = 540000 ms)
+    setInterval(() => {
+        fetch(`${SERVER_URL}/health`)
+            .then(res => {
+                if (res.ok) console.log(`[${new Date().toISOString()}] Keep-alive ping successful`);
+                else console.log(`[${new Date().toISOString()}] Keep-alive ping failed: ${res.statusText}`);
+            })
+            .catch(err => console.error(`[${new Date().toISOString()}] Keep-alive ping error:`, err.message));
+    }, 540000);
+}
+
 // Serve uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
